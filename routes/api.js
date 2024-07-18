@@ -7,22 +7,38 @@
 */
 
 'use strict';
+const Book = require("../models/book.ts");
 
 module.exports = function (app) {
 
   app.route('/api/books')
     .get(function (req, res){
-      //response will be array of book objects
-      //json res format: [{"_id": bookid, "title": book_title, "commentcount": num_of_comments },...]
+      //get all books from db
+      console.log(req.body);
+      Book.find({}, (err, books) => {
+        res.json(books.map(
+          (book) => ({
+            _id: book._id,
+            title: book.title,
+            commentcount: book.comments.length
+          })
+        ));
+      });
     })
     
-    .post(function (req, res){
+    .post(async function (req, res){
       let title = req.body.title;
-      //response will contain new book object including atleast _id and title
+     await Book.create({title:title}).then((err, res)=>{
+      console.log(res)
+      res.json({title:title, _id:res._id});
+     });
     })
     
     .delete(function(req, res){
-      //if successful response will be 'complete delete successful'
+      Book.deleteMany({}, (err, books) => {
+        console.log(books)
+        res.json('complete delete successful');
+      });
     });
 
 
@@ -30,17 +46,30 @@ module.exports = function (app) {
   app.route('/api/books/:id')
     .get(function (req, res){
       let bookid = req.params.id;
+
+      Book.findById(bookid, (err, book) => {
+        console.log(book)
+        res.json(book);
+      });
       //json res format: {"_id": bookid, "title": book_title, "comments": [comment,comment,...]}
     })
     
-    .post(function(req, res){
+    .post(async function(req, res){
       let bookid = req.params.id;
       let comment = req.body.comment;
+
+      const book = await Book.addComment(bookid, comment);
+      res.json(book);
       //json res format same as .get
     })
     
     .delete(function(req, res){
       let bookid = req.params.id;
+      Book.findByIdAndDelete(bookid, (err, book) => {
+        console.log(book)
+        res.json('delete successful');
+      });
+
       //if successful response will be 'delete successful'
     });
   
