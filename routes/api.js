@@ -7,50 +7,69 @@
 */
 
 'use strict';
-const Book = require("../models/book.ts");
+const {Book, addComment} = require("../models/book");
 
 module.exports = function (app) {
 
   app.route('/api/books')
-    .get(function (req, res){
-      //get all books from db
-      console.log(req.body);
-      Book.find({}, (err, books) => {
-        res.json(books.map(
-          (book) => ({
-            _id: book._id,
-            title: book.title,
-            commentcount: book.comments.length
-          })
-        ));
-      });
+    .get(async function (req, res){
+      const books = await Book.find({});
+      const resbooks = books.map(book =>
+        ({
+          _id: book._id,
+          title: book.title,
+          commentcount: book.comments.length || 0
+        })
+      );
+      res.json(resbooks);
     })
     
     .post(async function (req, res){
       let title = req.body.title;
-     await Book.create({title:title}).then((err, res)=>{
-      console.log(res)
-      res.json({title:title, _id:res._id});
-     });
+      if (!title){
+        res.json( 'missing required field title');
+      }
+      
+      try{
+        const book =  new Book ({title:title})
+        await book.save();
+        res.json({title: book.title, _id: book._id});
+      }catch(err){
+      }
+ 
+ 
     })
     
-    .delete(function(req, res){
-      Book.deleteMany({}, (err, books) => {
-        console.log(books)
+    .delete(async function(req, res){
+      try{
+        await Book.deleteMany({});
         res.json('complete delete successful');
-      });
+      }
+      catch(err){
+        res.json('could not delete books');
+      }
+
     });
 
 
 
   app.route('/api/books/:id')
-    .get(function (req, res){
+    .get(async function (req, res){
       let bookid = req.params.id;
 
-      Book.findById(bookid, (err, book) => {
-        console.log(book)
-        res.json(book);
-      });
+      try{
+        const book = await Book.findById(bookid);
+        if (!book) {
+          res.json( 'no book exists');
+        } else {
+          res.json(book);
+        }
+       
+      } catch(err){
+        res.json( 'no book exists');
+      }
+
+
       //json res format: {"_id": bookid, "title": book_title, "comments": [comment,comment,...]}
     })
     
@@ -58,19 +77,32 @@ module.exports = function (app) {
       let bookid = req.params.id;
       let comment = req.body.comment;
 
-      const book = await Book.addComment(bookid, comment);
+      const book = await addComment(bookid, comment);
       res.json(book);
-      //json res format same as .get
+
     })
     
-    .delete(function(req, res){
+    .delete(async function(req, res){
       let bookid = req.params.id;
-      Book.findByIdAndDelete(bookid, (err, book) => {
-        console.log(book)
-        res.json('delete successful');
-      });
+      let message = '';
+      try{
+         await Book.findById(bookid);
+      }
+       catch(err){
+        res.json("no book exists");
+         return 
+       }
+      
+       const count =  await Book.deleteOne({_id: bookid});
+       if (count.deletedCount === 0) {
+         message = "no book exists";
+       } else if (count.deletedCount === 1){
+        message = "delete successful";
+       }
 
-      //if successful response will be 'delete successful'
+   
+
+      res.json(message)
     });
   
 };
